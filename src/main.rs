@@ -47,10 +47,23 @@ async fn main() -> Result<()> {
             import_file(&f, &config.database, &pool).await?;
         },
         config::Source::Directory(dir) => {
-
+            import_directory(&dir, &config.database, &pool).await?;
         }
     }
     
+    Ok(())
+}
+
+async fn import_directory(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
+    let paths = std::fs::read_dir(f)?;
+
+    for entry in paths {
+        if let Ok(f) = entry {
+            let path = f.path();
+            let _ = import_file(&path, db_config, pool).await;
+        }
+    }
+
     Ok(())
 }
 

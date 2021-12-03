@@ -224,7 +224,6 @@ pub fn parse_args() -> Result<Config, Box<dyn Error>> {
             if directory_contains_csvs(&p) {
                 Source::Directory(p.to_path_buf())
             } else {
-                
                 return Err(Box::new(ConfigError::directory_empty(d)))
             }
             
@@ -245,13 +244,15 @@ pub fn parse_args() -> Result<Config, Box<dyn Error>> {
 }
 
 fn directory_contains_csvs(p: &Path) -> bool {
+    let ext = Some(std::ffi::OsStr::new("csv"));
+
     let read_result = std::fs::read_dir(p);
     return if read_result.is_ok() {
         let read_dir: std::fs::ReadDir = read_result.unwrap();
         for entry in read_dir {
             if let std::io::Result::Ok(dir_entry) = entry {
-                let path = dir_entry.path();
-                if path.ends_with(".csv") {
+                let path: PathBuf = dir_entry.path();
+                if ext == path.extension() {
                     return true
                 }
             }

@@ -85,7 +85,7 @@ async fn insert_single_row(row: &CsvRecord, table_name: &str, tx: &mut PgTx<'_>)
         VALUES($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING", 
         table_name = table_name);
 
-    let _ = sqlx::query(&sql)
+    let insert_result = sqlx::query(&sql)
         .bind(&row.account)
         .bind(row.id as i32)
         .bind(&row.date)
@@ -97,7 +97,11 @@ async fn insert_single_row(row: &CsvRecord, table_name: &str, tx: &mut PgTx<'_>)
         .bind(&row.category)
         .bind(&row.subcategory)
         .bind(&row.notes)
-        .execute(tx).await?;
+        .execute(tx).await;
+
+    if insert_result.is_err() {
+        error!("Could not insert row: {}, {}", row.account, row.id);
+    }
 
     Ok(())
 }

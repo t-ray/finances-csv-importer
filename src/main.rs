@@ -97,13 +97,17 @@ fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
         .trim(csv::Trim::Headers)
         .from_path(f)?;
 
+    let mut bad_rows = 0;
+
     for result in reader.deserialize::<CsvRecord>() {
         // let record: CsvRecord = result?;
         if let Ok(record) = result {
             records.push(record);
+        } else {
+            bad_rows += 1;
         }
     }
 
-    info!("Read {} records from file.", records.len());
+    info!("Read {} records from file. {} rows ignored because they could not be loaded.", records.len(), bad_rows);
     Ok(records)
 }

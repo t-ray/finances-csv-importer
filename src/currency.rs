@@ -9,6 +9,15 @@ pub struct Currency {
     digits: u8
 }
 
+impl Currency {
+    fn zero() -> Self {
+        Self {
+            whole: 0,
+            digits: 0
+        }
+    }
+}
+
 impl fmt::Display for Currency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}.{:02}", self.whole, self.digits)
@@ -59,7 +68,11 @@ impl FromStr for Currency {
             return Ok(result)
 
         } else {
-            return Err(ParseCurrencyError::new(from));
+            if from.replace(" ", "") == "$-" {
+                return Ok(Currency::zero())
+            } else {
+                return Err(ParseCurrencyError::new(from));
+            }
         }
     }
 }

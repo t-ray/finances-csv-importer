@@ -150,3 +150,23 @@ is already pretty quick.
 ## Automatic DB Schema Creation
 I would like the ability to automatically create the destination schema in the target database
 if it doesn't already exist. 
+
+# Database Included
+There are some utility scripts to create an instance of postgres 11 and run it locally.
+These scripts will initialize a database using a docker volume with the name `financedb_data`,
+but that can be overridden via command line arguments. 
+
+Database setup is a two-step process:
+* initialization: `./scripts/init-postgres.sh`
+* running container: `./scripts/run-postgres.sh`
+
+### Database initialization
+The init-postgres.sh script initializes a new docker volume with the name `financedb_data`
+(this name can be overridden via command line; look at the script), and creates the initial
+database core files under that volume. The init script then chowns the private database
+files under that volume to the current user. 
+
+### Running the database
+The database is executed via `./scripts/run-postgres.sh`, and it assumes the same volume as 
+the init script. It uses `postgres` for each of the arguments (database name, user, password, etc),
+and it runs on port 15432 rather than 5432. Feel free to change as necessary.

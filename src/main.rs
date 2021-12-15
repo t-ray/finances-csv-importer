@@ -25,13 +25,6 @@ async fn main() -> Result<()> {
 
     env_logger::init();
 
-
-    // let s = "9/22/2021 00:00:00 +00:00";
-    // let d = DateTime::parse_from_str(s, "%m/%d/%Y %H:%M:%S %z")
-    //     .map(|dt| dt.date());
-    
-    // println!("{:?}", d);
-
     let config = match config::parse_args() {
         Ok(c) => c,
         Err(e) => return Err(e)
@@ -87,7 +80,6 @@ async fn load_rows(rows: &[CsvRecord], db_config: &DatabaseConfig, pool: &PgPool
 }
 
 fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
-
 
     let abs_path = f.canonicalize()?;
     info!("Reading csv records from file {:?}", abs_path);

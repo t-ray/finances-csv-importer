@@ -1,0 +1,7 @@
+ACCOUNT,ID,Date, Amount , Balance ,Vendor,Digits,Type,Category,Subcategory,Notes
+BOFA8556,00000001,9/22/2021, $ 100.00 , $ 100.00 ,Self,3333,Deposit,Income,,Initial Deposit
+BOFA8556,00000002,9/23/2021, $ 50.00 , $ 50.00 ,Bank Of Ameria,3333,Transfer,Savings,,
+BOFA8556,00000003,9/23/2021, $ 12.33 , $ 37.67 ,Kroger,3333,Debit,Groceries,,
+BOFA8556,00000004,9/24/2021, $ 7.49 , $ 30.18 ,HBO Max,3333,Debit,Entertainment,TV,
+BOFA8556,00000005,9/24/2021, $ 20.00 , $ 10.18 ,Best Buy,3333,ACH,Credit Cards,,
+BOFA8556,00000006,9/24/2021, $ (75.00), $ 85.18 ,Facebook Marketplace,3333,Deposit,Income,,Sold that old TV

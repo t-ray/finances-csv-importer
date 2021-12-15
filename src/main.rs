@@ -1,49 +1,49 @@
 mod config;
 mod currency;
-mod domain;
 mod db;
+mod domain;
 
-use std::{error::Error, path::PathBuf};
-use std::fmt;
-use std::str::FromStr;
+use std::path::PathBuf;
 
-use csv::{ReaderBuilder};
-use log::{debug, info, error};
-use serde::{Deserialize, Deserializer};
+use csv::ReaderBuilder;
+use log::{error, info};
 use tokio;
 
-use chrono::prelude::*;
-
-use domain::CsvRecord;
 use config::DatabaseConfig;
+use domain::CsvRecord;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 type PgPool = sqlx::pool::Pool<sqlx::postgres::Postgres>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     env_logger::init();
 
     let config = match config::parse_args() {
         Ok(c) => c,
-        Err(e) => return Err(e)
+        Err(e) => return Err(e),
     };
 
     let pool = match db::connect(&config.database).await {
         Ok(p) => p,
-        Err(e) => return Err(Box::new(e))
+        Err(e) => return Err(Box::new(e)),
     };
-    
+
+    if config.database.is_init() {
+        if let Err(e) = db::init(&config.database, &pool).await {
+            return Err(Box::new(e));
+        }
+    }
+
     match config.source {
         config::Source::File(f) => {
             import_file(&f, &config.database, &pool).await?;
-        },
+        }
         config::Source::Directory(dir) => {
             import_directory(&dir, &config.database, &pool).await?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -61,17 +61,16 @@ async fn import_directory(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool
 }
 
 async fn import_file(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
-
     return match read_file(f) {
         Ok(records) => {
             load_rows(&records, db_config, pool).await?;
             Ok(())
-        },
+        }
         Err(e) => {
             error!("Could not read csv file. Aborting");
             Err(e)
         }
-    }
+    };
 }
 
 async fn load_rows(rows: &[CsvRecord], db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
@@ -80,14 +79,11 @@ async fn load_rows(rows: &[CsvRecord], db_config: &DatabaseConfig, pool: &PgPool
 }
 
 fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
-
     let abs_path = f.canonicalize()?;
     info!("Reading csv records from file {:?}", abs_path);
 
     let mut records = Vec::new();
-    let mut reader = ReaderBuilder::new()
-        .trim(csv::Trim::Headers)
-        .from_path(f)?;
+    let mut reader = ReaderBuilder::new().trim(csv::Trim::Headers).from_path(f)?;
 
     let mut bad_rows = 0;
 
@@ -100,6 +96,10 @@ fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
         }
     }
 
-    info!("Read {} records from file. {} rows ignored because they could not be loaded.", records.len(), bad_rows);
+    info!(
+        "Read {} records from file. {} rows ignored because they could not be loaded.",
+        records.len(),
+        bad_rows
+    );
     Ok(records)
 }

@@ -1,10 +1,9 @@
-use std::fmt;
 use serde::{Deserialize, Deserializer};
+use std::fmt;
 
 use chrono::prelude::*;
 
-use crate::currency::{Currency, deserialize_money};
-
+use crate::currency::{deserialize_money, Currency};
 
 #[derive(Deserialize, Debug)]
 pub struct CsvRecord {
@@ -12,11 +11,11 @@ pub struct CsvRecord {
     pub account: String,
     #[serde(rename = "ID")]
     pub id: u64,
-    #[serde(rename = "Date", deserialize_with="parse_date_time")]
+    #[serde(rename = "Date", deserialize_with = "parse_date_time")]
     pub date: DateTime<FixedOffset>,
-    #[serde(rename = "Amount", deserialize_with="deserialize_money")]
+    #[serde(rename = "Amount", deserialize_with = "deserialize_money")]
     pub amount: Currency,
-    #[serde(rename = "Balance", deserialize_with="deserialize_money")]
+    #[serde(rename = "Balance", deserialize_with = "deserialize_money")]
     pub balance: Currency,
     #[serde(rename = "Vendor")]
     pub vendor: String,
@@ -29,7 +28,7 @@ pub struct CsvRecord {
     #[serde(rename = "Subcategory")]
     pub subcategory: Option<String>,
     #[serde(rename = "Notes")]
-    pub notes: Option<String>
+    pub notes: Option<String>,
 }
 
 impl fmt::Display for CsvRecord {
@@ -49,12 +48,12 @@ impl fmt::Display for CsvRecord {
 }
 
 pub fn parse_date_time<'de, D>(d: D) -> std::result::Result<DateTime<FixedOffset>, D::Error>
-    where D: Deserializer<'de> {
+where
+    D: Deserializer<'de>,
+{
     let buf = String::deserialize(d)?;
 
     let formatted = format!("{}  00:00:00 +00:00", buf);
 
-    DateTime::parse_from_str(&formatted, "%m/%d/%Y %H:%M:%S %z")
-        .map_err(serde::de::Error::custom)
+    DateTime::parse_from_str(&formatted, "%m/%d/%Y %H:%M:%S %z").map_err(serde::de::Error::custom)
 }
-

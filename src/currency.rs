@@ -6,14 +6,14 @@ use serde::{Deserialize, Deserializer};
 #[derive(Debug)]
 pub struct Currency {
     whole: i32,
-    digits: u8
+    digits: u8,
 }
 
 impl Currency {
     fn zero() -> Self {
         Self {
             whole: 0,
-            digits: 0
+            digits: 0,
         }
     }
 }
@@ -28,9 +28,7 @@ impl FromStr for Currency {
     type Err = ParseCurrencyError;
 
     fn from_str(from: &str) -> Result<Self, Self::Err> {
-
         if let Some((whole_chars, digit_chars)) = from.split_once(".") {
-
             let mut negative = false;
             let mut whole = 0i32;
             let mut digits = 0;
@@ -56,20 +54,19 @@ impl FromStr for Currency {
                     }
                 }
             }
-            
+
             if negative {
                 whole *= -1;
             }
 
-            let result = Currency { 
-                whole, 
-                digits: digits as u8
+            let result = Currency {
+                whole,
+                digits: digits as u8,
             };
-            return Ok(result)
-
+            return Ok(result);
         } else {
             if from.replace(" ", "") == "$-" {
-                return Ok(Currency::zero())
+                return Ok(Currency::zero());
             } else {
                 return Err(ParseCurrencyError::new(from));
             }
@@ -79,13 +76,13 @@ impl FromStr for Currency {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseCurrencyError {
-    source: String
+    source: String,
 }
 
 impl ParseCurrencyError {
     fn new(s: &str) -> Self {
         ParseCurrencyError {
-            source: s.to_string()
+            source: s.to_string(),
         }
     }
 }
@@ -103,9 +100,9 @@ impl std::error::Error for ParseCurrencyError {
 }
 
 pub fn deserialize_money<'de, D>(d: D) -> std::result::Result<Currency, D::Error>
-    where D: Deserializer<'de> {
+where
+    D: Deserializer<'de>,
+{
     let buf = String::deserialize(d)?;
-    Currency::from_str(&buf)
-        .map_err(serde::de::Error::custom)
+    Currency::from_str(&buf).map_err(serde::de::Error::custom)
 }
-

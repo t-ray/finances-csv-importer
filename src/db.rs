@@ -1,8 +1,9 @@
-use log::{info, debug, error};
-use sqlx::{self, Database, Executor};
-
+use log::{debug, error, info};
+use serde::Serialize;
 use sqlx::pool::Pool;
-use sqlx::postgres::{PgPoolOptions, PgConnectOptions, Postgres};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions, Postgres};
+use sqlx::{self};
+use tinytemplate::TinyTemplate;
 
 use crate::config;
 use crate::domain::CsvRecord;
@@ -13,6 +14,11 @@ type PgTx<'a> = sqlx::Transaction<'a, Postgres>;
 #[derive(Debug)]
 pub enum DatabaseError {
     ConnectionError,
+}
+
+#[derive(Serialize)]
+struct TemplateParams {
+    table_name: String,
 }
 
 impl DatabaseError {
@@ -32,25 +38,26 @@ impl std::fmt::Display for DatabaseError {
 impl std::error::Error for DatabaseError {
     fn description(&self) -> &str {
         match self {
-            Self::ConnectionError => "Could not connect to database."
+            Self::ConnectionError => "Could not connect to database.",
         }
     }
 }
 
 pub async fn connect(c: &config::DatabaseConfig) -> Result<Pool<Postgres>, DatabaseError> {
-
     let connect_options = PgConnectOptions::from(c);
 
     info!("Attempting to connect to database.");
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect_with(connect_options).await
+        .connect_with(connect_options)
+        .await
         .map_err(|_| DatabaseError::connection())?;
 
     // Make a simple query to return the given parameter (use a question mark `?` instead of `$1` for MySQL)
     let _: (i64,) = sqlx::query_as("SELECT $1")
         .bind(150_i64)
-        .fetch_one(&pool).await
+        .fetch_one(&pool)
+        .await
         .map_err(|_| DatabaseError::connection())?;
 
     info!("Successfully connected to database.");
@@ -58,8 +65,36 @@ pub async fn connect(c: &config::DatabaseConfig) -> Result<Pool<Postgres>, Datab
     Ok(pool)
 }
 
-pub async fn import(records: &[CsvRecord], table_name: &str, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn init(c: &config::DatabaseConfig, pool: &PgPool) -> Result<(), sqlx::Error> {
+    let template = include_str!("templates/init.sql");
 
+    let params = TemplateParams {
+        table_name: c.get_table_name(),
+    };
+    let mut tt = TinyTemplate::new();
+
+    let _ = tt.add_template("init", template);
+    if let Ok(rendered) = tt.render("init", &params) {
+        info!("Initializing database.");
+
+        let mut tx = pool.begin().await?;
+
+        let statements = rendered.split(";;;");
+        for statement in statements {
+            sqlx::query(statement).execute(&mut tx).await?;
+        }
+
+        tx.commit().await?;
+        info!("Database schema and indexes successfully created.");
+    }
+    Ok(())
+}
+
+pub async fn import(
+    records: &[CsvRecord],
+    table_name: &str,
+    pool: &PgPool,
+) -> Result<(), sqlx::Error> {
     let chunk_size = 50;
 
     for chunk in records.chunks(chunk_size) {
@@ -71,16 +106,19 @@ pub async fn import(records: &[CsvRecord], table_name: &str, pool: &PgPool) -> R
                 error!("Could not insert row {}/{}", row.account, row.id);
             }
         }
-        
+
         tx.commit().await?;
         debug!("Chunk of {} records inserted and committed.", chunk.len())
     }
 
-    
     Ok(())
 }
 
-async fn insert_single_row(row: &CsvRecord, table_name: &str, tx: &mut PgTx<'_>) -> Result<(), sqlx::Error> {
+async fn insert_single_row(
+    row: &CsvRecord,
+    table_name: &str,
+    tx: &mut PgTx<'_>,
+) -> Result<(), sqlx::Error> {
     let sql = format!("INSERT INTO {table_name}(account, tx_id, tx_date, amount, balance, vendor, digits, transaction_type, category, subcategory, notes) 
         VALUES($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING", 
         table_name = table_name);
@@ -97,7 +135,8 @@ async fn insert_single_row(row: &CsvRecord, table_name: &str, tx: &mut PgTx<'_>)
         .bind(&row.category)
         .bind(&row.subcategory)
         .bind(&row.notes)
-        .execute(tx).await;
+        .execute(tx)
+        .await;
 
     if insert_result.is_err() {
         error!("Could not insert row: {}, {}", row.account, row.id);
@@ -105,4 +144,3 @@ async fn insert_single_row(row: &CsvRecord, table_name: &str, tx: &mut PgTx<'_>)
 
     Ok(())
 }
-

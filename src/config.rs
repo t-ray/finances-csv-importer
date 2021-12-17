@@ -4,9 +4,13 @@ use std::path::{Path, PathBuf};
 use clap::{App, Arg};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
+use crate::domain;
+use crate::domain::LoadOptions;
+
 pub struct Config {
     pub database: DatabaseConfig,
     pub source: Source,
+    pub load_options: domain::LoadOptions,
 }
 
 pub enum Source {
@@ -242,7 +246,14 @@ pub fn parse_args() -> Result<Config, Box<dyn Error>> {
                 .takes_value(true)
                 .env("DB_TABLE"),
         )
-        .arg(Arg::with_name("init_db").short("init").takes_value(false))
+        .arg(Arg::with_name("init_db").long("init").takes_value(false))
+        .arg(Arg::with_name("load_all").long("all").takes_value(false))
+        .arg(
+            Arg::with_name("load_new")
+                .long("new")
+                .takes_value(false)
+                .conflicts_with("load_all"),
+        )
         .get_matches();
 
     let source = if let Some(f) = matches.value_of("file") {
@@ -255,7 +266,7 @@ pub fn parse_args() -> Result<Config, Box<dyn Error>> {
     } else if let Some(d) = matches.value_of("directory") {
         let p = Path::new(d);
         if p.exists() {
-            if directory_contains_csvs(&p) {
+            if directory_contains_csvs(p) {
                 Source::Directory(p.to_path_buf())
             } else {
                 return Err(Box::new(ConfigError::directory_empty(d)));
@@ -269,9 +280,19 @@ pub fn parse_args() -> Result<Config, Box<dyn Error>> {
         )));
     };
 
+    let load_options = if matches.is_present("load_new") {
+        LoadOptions::New
+    } else {
+        LoadOptions::All
+    };
+
     let database = DatabaseConfig::from(matches);
 
-    let c = Config { database, source };
+    let c = Config {
+        database,
+        source,
+        load_options,
+    };
     Ok(c)
 }
 
@@ -279,8 +300,8 @@ fn directory_contains_csvs(p: &Path) -> bool {
     let ext = Some(std::ffi::OsStr::new("csv"));
 
     let read_result = std::fs::read_dir(p);
-    return if read_result.is_ok() {
-        let read_dir: std::fs::ReadDir = read_result.unwrap();
+    return if let Ok(read_dir) = read_result {
+        // let read_dir: std::fs::ReadDir = read_result.unwrap();
         for entry in read_dir {
             if let std::io::Result::Ok(dir_entry) = entry {
                 let path: PathBuf = dir_entry.path();

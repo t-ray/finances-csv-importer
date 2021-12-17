@@ -77,6 +77,11 @@ Other precisions could be chosen; this precision seemed like a sensible default
 for typical banking transactions for personal accounts in the US. Feel free to play with other 
 precisions.
 
+### Automatic Schema Generation
+If the `--init` switch is used, the import tool will automatically attempt to create the
+transactions table (or whatever table is specified by `--db_table`) and all appropriate 
+indexes. 
+
 ## CSV Files
 The importer can import rows from either a single file (using `--file`), or all csv files 
 in a directory (using `--directory`). If importing a directory, the importer specifically filters for 
@@ -122,6 +127,12 @@ Batch insertion is a prime candidate for improvement.
 Row insertion uses the syntax `INSERT INTO ... ON CONFLICT DO NOTHING`; so re-importing the same file
 again and again is not a destructive operation. 
 
+### Import Resumption
+This feature assumes that a source spreadsheet is exported to the same target csv file multiple times, and
+there is little use in re-importing the same rows over and over again. In this scenario, the importer would select
+the largest `tx_id` for a given `account` in the destination table, and only attempt to insert rows read from the
+csv file where tx_id exceeds the queried maximum. This feature is enabled via the `--new` switch.
+
 # Code Structure
 There is the entrypoint, `main.rs`, and only a handful of modules: 
 * config.rs - defines and parses the command line arguments (and supports environment variables)
@@ -131,25 +142,6 @@ There is the entrypoint, `main.rs`, and only a handful of modules:
 
 The main module simply defines the logic for loading the configuration, establishing the database connection,
 and reading the file/directory contents.
-
-# Planned Improvements
-For myself, there's not much left to do. For others, this tool could certainly be improved by supporting
-other databases, be less restrictive on both CSV and database schemas, and support other currency and date formats. 
-
-But in the near term, I do plan on implementing the following:
-
-## Import Resumption
-This feature would assume that a source spreadsheet is exported to the same target csv file multiple times, and
-there is little use in re-importing the same rows over and over again. In this scenario, the importer would select
-the largest `tx_id` for a given `account` in the destination table, and only attempt to insert rows read from the
-csv file where tx_id exceeds the queried maximum. 
-
-This feature is a *slight* optimization. Unless you're dealing with thousands and thousands of rows, this tool
-is already pretty quick. 
-
-## Automatic DB Schema Creation
-I would like the ability to automatically create the destination schema in the target database
-if it doesn't already exist. 
 
 # Database Included
 There are some utility scripts to create an instance of postgres 11 and run it locally.

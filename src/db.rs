@@ -65,6 +65,7 @@ pub async fn connect(c: &config::DatabaseConfig) -> Result<Pool<Postgres>, Datab
     Ok(pool)
 }
 
+/// initializes the database by applying the database schema
 pub async fn init(c: &config::DatabaseConfig, pool: &PgPool) -> Result<(), sqlx::Error> {
     let template = include_str!("templates/init.sql");
 
@@ -92,6 +93,15 @@ pub async fn init(c: &config::DatabaseConfig, pool: &PgPool) -> Result<(), sqlx:
 
 pub async fn import(
     records: &[CsvRecord],
+    table_name: &str,
+    pool: &PgPool,
+) -> Result<(), sqlx::Error> {
+    let refs = records.iter().collect::<Vec<_>>();
+    import_refs(&refs, table_name, pool).await
+}
+
+pub async fn import_refs(
+    records: &[&CsvRecord],
     table_name: &str,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
@@ -143,4 +153,20 @@ async fn insert_single_row(
     }
 
     Ok(())
+}
+
+/// selects the max transaction ordinal for the given account, if any
+pub async fn select_max_tx_for_account(
+    account: &str,
+    table_name: &str,
+    pool: &PgPool,
+) -> Result<i32, sqlx::Error> {
+    let sql = format!(
+        "SELECT MAX(tx_id) FROM {table_name} WHERE account = $1",
+        table_name = table_name
+    );
+
+    let row: (i32,) = sqlx::query_as(&sql).bind(account).fetch_one(pool).await?;
+
+    Ok(row.0)
 }

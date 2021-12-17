@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Currency {
     whole: i32,
     digits: u8,
@@ -63,13 +63,11 @@ impl FromStr for Currency {
                 whole,
                 digits: digits as u8,
             };
-            return Ok(result);
+            Ok(result)
+        } else if from.replace(" ", "") == "$-" {
+            Ok(Currency::zero())
         } else {
-            if from.replace(" ", "") == "$-" {
-                return Ok(Currency::zero());
-            } else {
-                return Err(ParseCurrencyError::new(from));
-            }
+            Err(ParseCurrencyError::new(from))
         }
     }
 }

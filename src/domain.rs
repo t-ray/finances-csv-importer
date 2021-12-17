@@ -5,7 +5,7 @@ use chrono::prelude::*;
 
 use crate::currency::{deserialize_money, Currency};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct CsvRecord {
     #[serde(rename = "ACCOUNT")]
     pub account: String,
@@ -29,6 +29,12 @@ pub struct CsvRecord {
     pub subcategory: Option<String>,
     #[serde(rename = "Notes")]
     pub notes: Option<String>,
+}
+
+#[derive(Copy, Clone)]
+pub enum LoadOptions {
+    All,
+    New,
 }
 
 impl fmt::Display for CsvRecord {

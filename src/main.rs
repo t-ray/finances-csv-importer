@@ -3,12 +3,13 @@ mod currency;
 mod db;
 mod domain;
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use csv::ReaderBuilder;
+use itertools::Itertools;
 use log::{error, info};
-use tokio;
 
+use crate::domain::LoadOptions;
 use config::DatabaseConfig;
 use domain::CsvRecord;
 
@@ -35,35 +36,45 @@ async fn main() -> Result<()> {
         }
     }
 
+    let options = config.load_options;
+
     match config.source {
         config::Source::File(f) => {
-            import_file(&f, &config.database, &pool).await?;
+            import_file(&f, options, &config.database, &pool).await?;
         }
         config::Source::Directory(dir) => {
-            import_directory(&dir, &config.database, &pool).await?;
+            import_directory(&dir, options, &config.database, &pool).await?;
         }
     }
 
     Ok(())
 }
 
-async fn import_directory(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
+async fn import_directory(
+    f: &Path,
+    options: LoadOptions,
+    db_config: &DatabaseConfig,
+    pool: &PgPool,
+) -> Result<()> {
     let paths = std::fs::read_dir(f)?;
 
-    for entry in paths {
-        if let Ok(f) = entry {
-            let path = f.path();
-            let _ = import_file(&path, db_config, pool).await;
-        }
+    for entry in paths.flatten() {
+        let path = entry.path();
+        let _ = import_file(&path, options, db_config, pool).await;
     }
 
     Ok(())
 }
 
-async fn import_file(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
+async fn import_file(
+    f: &Path,
+    options: LoadOptions,
+    db_config: &DatabaseConfig,
+    pool: &PgPool,
+) -> Result<()> {
     return match read_file(f) {
         Ok(records) => {
-            load_rows(&records, db_config, pool).await?;
+            load_rows(&records, options, db_config, pool).await?;
             Ok(())
         }
         Err(e) => {
@@ -73,12 +84,49 @@ async fn import_file(f: &PathBuf, db_config: &DatabaseConfig, pool: &PgPool) -> 
     };
 }
 
-async fn load_rows(rows: &[CsvRecord], db_config: &DatabaseConfig, pool: &PgPool) -> Result<()> {
-    db::import(rows, &db_config.get_table_name(), pool).await?;
+async fn load_rows(
+    rows: &[CsvRecord],
+    options: LoadOptions,
+    db_config: &DatabaseConfig,
+    pool: &PgPool,
+) -> Result<()> {
+    let table_name = db_config.get_table_name();
+
+    match options {
+        LoadOptions::All => db::import(rows, &table_name, pool).await?,
+        LoadOptions::New => load_new_rows(rows, &table_name, pool).await?,
+    }
+
     Ok(())
 }
 
-fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
+async fn load_new_rows(rows: &[CsvRecord], table_name: &str, pool: &PgPool) -> Result<()> {
+    // group by account
+    for (account, group) in &rows.iter().group_by(|r| r.account.clone()) {
+        let account_rows = group.collect::<Vec<_>>();
+        if let Ok(max) = db::select_max_tx_for_account(&account, table_name, pool).await {
+            let to_import = account_rows
+                .iter()
+                .filter(|r| r.id > max as u64)
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if !to_import.is_empty() {
+                info!(
+                    "Resuming import for account {} after tx {}. Attempting to import {} new rows.",
+                    account,
+                    max,
+                    to_import.len()
+                );
+                let _ = db::import_refs(&to_import, table_name, pool).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn read_file(f: &Path) -> Result<Vec<CsvRecord>> {
     let abs_path = f.canonicalize()?;
     info!("Reading csv records from file {:?}", abs_path);
 
@@ -88,11 +136,12 @@ fn read_file(f: &PathBuf) -> Result<Vec<CsvRecord>> {
     let mut bad_rows = 0;
 
     for result in reader.deserialize::<CsvRecord>() {
-        // let record: CsvRecord = result?;
-        if let Ok(record) = result {
-            records.push(record);
-        } else {
-            bad_rows += 1;
+        match result {
+            Ok(record) => records.push(record),
+            Err(e) => {
+                error!("Skipping row Could not read row: {}", e);
+                bad_rows += 1;
+            }
         }
     }
 

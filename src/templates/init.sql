@@ -17,3 +17,9 @@ CREATE INDEX IF NOT EXISTS idx_import_tx_date ON {table_name} (tx_date);;;
 CREATE INDEX IF NOT EXISTS idx_import_tx_vendor ON {table_name} (vendor);;;
 CREATE INDEX IF NOT EXISTS idx_import_tx_category ON {table_name} (category);;;
 CREATE INDEX IF NOT EXISTS idx_import_tx_type ON {table_name} (transaction_type);;;
+
+ALTER TABLE IF EXISTS {table_name}
+    ADD COLUMN IF NOT EXISTS is_income BOOL NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS is_fixed BOOL NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS is_spend BOOL NOT NULL DEFAULT false
+;

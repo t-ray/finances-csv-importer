@@ -129,8 +129,8 @@ async fn insert_single_row(
     table_name: &str,
     tx: &mut PgTx<'_>,
 ) -> Result<(), sqlx::Error> {
-    let sql = format!("INSERT INTO {table_name}(account, tx_id, tx_date, amount, balance, vendor, digits, transaction_type, category, subcategory, notes) 
-        VALUES($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING", 
+    let sql = format!("INSERT INTO {table_name}(account, tx_id, tx_date, amount, balance, vendor, digits, transaction_type, category, subcategory, notes, is_income, is_fixed, is_spend)
+        VALUES($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING",
         table_name = table_name);
 
     let insert_result = sqlx::query(&sql)
@@ -145,6 +145,9 @@ async fn insert_single_row(
         .bind(&row.category)
         .bind(&row.subcategory)
         .bind(&row.notes)
+        .bind(&row.income)
+        .bind(&row.fixed)
+        .bind(&row.spend)
         .execute(tx)
         .await;
 

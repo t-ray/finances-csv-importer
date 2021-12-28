@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer};
 use std::fmt;
 
 use chrono::prelude::*;
+use serde::de::Unexpected;
 
 use crate::currency::{deserialize_money, Currency};
 
@@ -29,6 +30,13 @@ pub struct CsvRecord {
     pub subcategory: Option<String>,
     #[serde(rename = "Notes")]
     pub notes: Option<String>,
+    #[serde(rename = "Income", deserialize_with = "parse_bool")]
+    pub income: bool,
+    #[serde(rename = "Fixed", deserialize_with = "parse_bool")]
+    pub fixed: bool,
+    #[serde(rename = "Spend", deserialize_with = "parse_bool")]
+    pub spend: bool,
+
 }
 
 #[derive(Copy, Clone)]
@@ -53,7 +61,20 @@ impl fmt::Display for CsvRecord {
     }
 }
 
-pub fn parse_date_time<'de, D>(d: D) -> std::result::Result<DateTime<FixedOffset>, D::Error>
+fn parse_bool<'de, D>(d: D) -> std::result::Result<bool, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    let v =
+    String::deserialize(d)?
+        .to_lowercase();
+
+    v
+        .parse()
+        .map_err(|_|serde::de::Error::invalid_value(Unexpected::Str(&v), &"true|false"))
+}
+
+fn parse_date_time<'de, D>(d: D) -> std::result::Result<DateTime<FixedOffset>, D::Error>
 where
     D: Deserializer<'de>,
 {
